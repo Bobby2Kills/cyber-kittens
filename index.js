@@ -1,9 +1,30 @@
 const express = require('express');
+const jwt = require("jsonwebtoken")
 const app = express();
+require("dotenv").config();
 const { User } = require('./db');
+
+const SIGNING_SECRET = process.env.SIGNING_SECRET
+console.log("secret:", process.env.SIGNING_SECRET)
+
+const setUser = (req, res, next) => {
+  const auth = req.header('Authorization')
+  try {
+    if(!auth) {
+      next()
+      return
+    }
+    const [, token] = auth.split(" ")
+    const user = jwt.verify(token, SIGNING_SECRET)
+  } catch (error) {
+    console.log(error)
+    next(error)
+  }
+}
 
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
+app.use(setUser)
 
 app.get('/', async (req, res, next) => {
   try {
@@ -18,6 +39,19 @@ app.get('/', async (req, res, next) => {
     next(error)
   }
 });
+
+app.post('/register', async (req,res, next) => {
+  try {
+    const {username, password} = req.body;
+    console.log(username, password);
+    const {id} = await User.create({ username, password })
+    const token = jwt.sign({id, username}, SIGNING_SECRET)
+    res.sendStatus(200)
+  } catch (error) {
+    console.log(error)
+    next(error)
+  }
+})
 
 // Verifies token with jwt.verify and sets req.user
 // TODO - Create authentication middleware
